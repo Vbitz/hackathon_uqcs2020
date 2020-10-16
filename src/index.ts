@@ -1,6 +1,8 @@
 import {getEntryPoint} from './common';
 import {getLogger} from './logger';
 
+import './compiler/compiler.main';
+
 const log = getLogger('index');
 
 async function main(args: string[]): Promise<number> {
