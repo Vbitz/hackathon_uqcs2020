@@ -3,6 +3,11 @@ import {generate} from 'pegjs';
 const GRAMMAR = `
 // This language is a pretty simple lisp
 
+TopLevel "topLevel"
+  = _ head:Expression tail:(_ Expression)* _ {
+    return [head, ...tail.map((h) => h[1])]
+  }
+
 Expression "expression"
   = "(" _ head:Expression tail:(_ Expression)* _ ")" {
     return {
@@ -10,9 +15,9 @@ Expression "expression"
         "children": [head, ...tail.map((h) => h[1])]
     };
   }
-  / Operation { return {"kind": "op", "value": text()}; }
-  / value:Integer { return {"kind": "int", value}; }
-  / value:String { return {"kind": "str", value}; }
+  / Operation { return {"kind": "operation", "value": text()}; }
+  / value:Integer { return {"kind": "integer", value}; }
+  / value:String { return {"kind": "string", value}; }
   / Identifier
   
 Operation "operation"
@@ -25,7 +30,7 @@ String "string"
   = "\\"" [a-zA-Z, ]+ "\\"" { return JSON.parse(text()); }
 
 Identifier "identifier"
-  = [a-z]+ { return {kind: "id", name: text()}; }
+  = [a-z]+ { return {kind: "identifier", name: text()}; }
 
 _ "whitespace"
   = [ \\t\\n\\r]*
@@ -34,12 +39,12 @@ _ "whitespace"
 interface BaseNode {}
 
 export interface Identifer extends BaseNode {
-  kind: 'id';
+  kind: 'identifier';
   name: string;
 }
 
 export interface Operator extends BaseNode {
-  kind: 'op';
+  kind: 'operation';
   type: OperatorKind;
 }
 
@@ -58,12 +63,12 @@ export interface Expression extends BaseNode {
 }
 
 export interface StringLiteral extends BaseNode {
-  kind: 'str';
+  kind: 'string';
   value: string;
 }
 
 export interface NumberLiteral extends BaseNode {
-  kind: 'int';
+  kind: 'integer';
   value: number;
 }
 
@@ -79,7 +84,7 @@ export class Parser {
 
   constructor() {}
 
-  parseString(str: string): Node {
-    return this.parser.parse(str, {startRule: 'Expression'});
+  parseString(str: string): Node[] {
+    return this.parser.parse(str, {startRule: 'TopLevel'});
   }
 }

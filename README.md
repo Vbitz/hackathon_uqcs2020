@@ -14,3 +14,7 @@
   - I need a basic emulator for the system.
     - Easy enough to write once I have an micro-architecture.
   - I also need game stuff.
+
+## TODO List
+
+- Better error descriptions

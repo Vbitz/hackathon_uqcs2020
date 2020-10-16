@@ -1,6 +1,7 @@
 import {promises} from 'fs';
 import {registerEntryPoint} from '../common';
 import {getLogger} from '../logger';
+import {Compiler} from './compiler';
 import {Parser} from './parser';
 
 const log = getLogger('compiler:main');
@@ -20,7 +21,11 @@ registerEntryPoint('compiler', async args => {
 
   const ast = parser.parseString(sourceFileContent);
 
-  log.log(JSON.stringify(ast, undefined, '  '));
+  const compiler = new Compiler();
+
+  compiler.parseTree(ast);
+
+  const result = compiler.emit();
 
   return 0;
 });
