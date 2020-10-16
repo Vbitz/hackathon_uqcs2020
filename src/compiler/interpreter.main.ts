@@ -1,15 +1,11 @@
 import {promises} from 'fs';
 import {registerEntryPoint} from '../common';
-import {getLogger} from '../logger';
-import {Compiler} from './compiler';
+import {Interpreter} from './interpreter';
 import {Parser} from './parser';
+import {Program} from './program';
 
-const log = getLogger('compiler:main');
-
-registerEntryPoint('compiler', async args => {
+registerEntryPoint('compiler:interpreter', async args => {
   const [fileName] = args;
-
-  log.log('Compiling', fileName);
 
   if (fileName === undefined) {
     throw new Error('Please specify a source file');
@@ -21,11 +17,13 @@ registerEntryPoint('compiler', async args => {
 
   const ast = parser.parseString(sourceFileContent);
 
-  const compiler = new Compiler();
+  const program = new Program();
 
-  compiler.parseTree(ast);
+  program.parseTree(ast);
 
-  const result = compiler.emit();
+  const interpreter = new Interpreter(program);
+
+  interpreter.run();
 
   return 0;
 });

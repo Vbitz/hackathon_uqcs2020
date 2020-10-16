@@ -5,11 +5,11 @@ enum StatementNames {
   Function = 'fn',
 }
 
-enum SystemCallKind {
+export enum SystemCallKind {
   DebugPrint,
 }
 
-interface SystemCall {
+export interface SystemCall {
   kind: 'systemCall';
   type: SystemCallKind;
   args: Expression[];
@@ -36,7 +36,7 @@ export class FunctionDeclaration {
   }
 }
 
-export class Compiler {
+export class Program {
   private functions = new Map<string, FunctionDeclaration>();
 
   constructor() {}
@@ -49,6 +49,16 @@ export class Compiler {
 
   emit(): unknown {
     return;
+  }
+
+  getFunctionByName(name: string): FunctionDeclaration {
+    const func = this.functions.get(name);
+
+    if (func === undefined) {
+      throw new Error('Function not found.');
+    }
+
+    return func;
   }
 
   private parseNode(node: ast.Node) {

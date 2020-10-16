@@ -1,7 +1,8 @@
 import {getEntryPoint} from './common';
 import {getLogger} from './logger';
 
-import './compiler/compiler.main';
+import './compiler/program.main';
+import './compiler/interpreter.main';
 
 const log = getLogger('index');
 
