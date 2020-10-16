@@ -23,3 +23,7 @@ export function isIntegerLiteral(node: ast.Node): node is ast.NumberLiteral {
 export function matchIdentifer(node: ast.Node, name: string): boolean {
   return isIdentifer(node) && node.name === name;
 }
+
+export function matchOperator(node: ast.Node, op: ast.OperatorKind): boolean {
+  return isOperator(node) && node.value === op;
+}

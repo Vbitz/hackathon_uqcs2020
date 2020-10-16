@@ -1,4 +1,5 @@
 import {getLogger} from '../logger';
+import {OperatorKind} from './parser';
 import {
   Expression,
   FunctionDeclaration,
@@ -71,6 +72,24 @@ export class Interpreter {
       return expr.value;
     } else if (expr.kind === 'integer') {
       return expr.value.toString(10);
+    } else if (expr.kind === 'binaryExpression') {
+      const lhsValue = this.executeExpression(expr.lhs);
+      const rhsValue = this.executeExpression(expr.rhs);
+
+      const lhsNumber = parseInt(lhsValue, 10);
+      const rhsNumber = parseInt(rhsValue, 10);
+
+      if (expr.op === OperatorKind.Plus) {
+        return (lhsNumber + rhsNumber).toString(10);
+      } else if (expr.op === OperatorKind.Minus) {
+        return (lhsNumber - rhsNumber).toString(10);
+      } else if (expr.op === OperatorKind.Multiply) {
+        return (lhsNumber * rhsNumber).toString(10);
+      } else if (expr.op === OperatorKind.Divide) {
+        return (lhsNumber / rhsNumber).toString(10);
+      } else {
+        throw new Error('Unknown Operator');
+      }
     } else {
       throw new Error(`executeExpression not implemented for {}.`);
     }

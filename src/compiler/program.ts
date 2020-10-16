@@ -17,7 +17,17 @@ export interface SystemCall {
 
 export type Statement = SystemCall;
 
-export type Expression = ast.StringLiteral | ast.NumberLiteral;
+export interface BinaryExpression {
+  kind: 'binaryExpression';
+  op: ast.OperatorKind;
+  lhs: Expression;
+  rhs: Expression;
+}
+
+export type Expression =
+  | ast.StringLiteral
+  | ast.NumberLiteral
+  | BinaryExpression;
 
 function makeSystemCall(
   type: SystemCallKind,
@@ -125,9 +135,18 @@ export class Program {
       return node;
     } else if (utils.isIntegerLiteral(node)) {
       return node;
-    } else {
-      throw new Error('Not Implemented');
+    } else if (utils.isExpression(node)) {
+      const nodes = node.children;
+
+      if (utils.isOperator(nodes[1])) {
+        const lhs = this.parseExpression(nodes[0]);
+        const rhs = this.parseExpression(nodes[2]);
+
+        return {kind: 'binaryExpression', op: nodes[1].value, lhs, rhs};
+      }
     }
+
+    throw new Error('Not Implemented');
   }
 
   private declareFunction(func: FunctionDeclaration) {

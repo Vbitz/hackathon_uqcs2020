@@ -21,7 +21,7 @@ Expression "expression"
   / Identifier
   
 Operation "operation"
-  = "+" / "-" / ">"
+  = "+" / "-" / "*" / "/" / ">" / "<" / "==" / "!="
 
 Integer "integer"
   = _ [0-9]+ { return parseInt(text(), 10); }
@@ -45,12 +45,14 @@ export interface Identifer extends BaseNode {
 
 export interface Operator extends BaseNode {
   kind: 'operation';
-  type: OperatorKind;
+  value: OperatorKind;
 }
 
 export enum OperatorKind {
   Plus = '+',
   Minus = '-',
+  Multiply = '*',
+  Divide = '/',
   GreaterThan = '>',
   LesserThan = '<',
   Equals = '==',
