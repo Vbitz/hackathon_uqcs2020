@@ -1,0 +1,33 @@
+{
+  "name": "hackathon_uqcs2020",
+  "version": "1.0.0",
+  "description": "## Project Ideas",
+  "main": "index.js",
+  "scripts": {
+    "start": "npm run compile && node build/src",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "gts lint",
+    "clean": "gts clean",
+    "compile": "tsc",
+    "fix": "gts fix",
+    "prepare": "npm run compile",
+    "pretest": "npm run compile",
+    "posttest": "npm run lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vbitz/hackathon_uqcs2020.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Vbitz/hackathon_uqcs2020/issues"
+  },
+  "homepage": "https://github.com/Vbitz/hackathon_uqcs2020#readme",
+  "devDependencies": {
+    "gts": "^3.0.1",
+    "typescript": "^4.0.3",
+    "@types/node": "^14.11.2"
+  }
+}
