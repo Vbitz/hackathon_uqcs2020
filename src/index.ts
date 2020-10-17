@@ -3,6 +3,7 @@ import {getLogger} from './logger';
 
 import './compiler/program.main';
 import './compiler/interpreter.main';
+import './tictactoe';
 
 const log = getLogger('index');
 
