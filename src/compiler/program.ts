@@ -193,8 +193,8 @@ export class FunctionDeclaration extends Scope {
 }
 
 export class Program {
-  private functions = new Map<string, FunctionDeclaration>();
-  private variables: Variable[] = [];
+  readonly functions = new Map<string, FunctionDeclaration>();
+  readonly variables: Variable[] = [];
 
   private deferredCalls: Array<() => void> = [];
 
