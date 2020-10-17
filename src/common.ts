@@ -1,3 +1,7 @@
+export function expect(message: string): never {
+  throw new Error(message);
+}
+
 export type EntryPoint = (args: string[]) => Promise<number>;
 
 const entryPoints: Record<string, EntryPoint> = {};

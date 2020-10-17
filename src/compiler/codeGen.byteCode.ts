@@ -30,13 +30,22 @@ export interface PushIntegerInstruction extends BaseInstruction {
   value: number;
 }
 
+export interface PushUndefinedInstruction extends BaseInstruction {
+  kind: 'pushUndefined';
+}
+
 export interface PushVariableInstruction extends BaseInstruction {
   kind: 'pushVariable';
-  variable: Variable;
+  variable: number;
 }
 
 export interface AssignVariableInstruction extends BaseInstruction {
   kind: 'assignVariable';
+}
+
+export interface AssignVariableDirectInstruction extends BaseInstruction {
+  kind: 'assignVariableDirect';
+  target: number;
 }
 
 export interface BinaryExpressionInstruction extends BaseInstruction {
@@ -60,6 +69,7 @@ export interface CallInstruction extends BaseInstruction {
 export interface SystemCallInstruction extends BaseInstruction {
   kind: 'systemCall';
   type: SystemCallKind;
+  length: number;
 }
 
 export interface EnterBlockInstruction extends BaseInstruction {
@@ -96,8 +106,10 @@ export type ByteCodeInstruction =
   | PushStringInstruction
   | PushBooleanInstruction
   | PushIntegerInstruction
+  | PushUndefinedInstruction
   | PushVariableInstruction
   | AssignVariableInstruction
+  | AssignVariableDirectInstruction
   | BinaryExpressionInstruction
   | ArrayGetInstruction
   | ArraySetInstruction
@@ -122,8 +134,14 @@ export interface ByteCodeBlock {
   instructions: ByteCodeInstruction[];
 }
 
+export interface ByteCodeFunction {
+  entryBlock: number;
+  variables: number[];
+}
+
 export interface ByteCode {
-  functions: Record<string, BlockId>;
+  topLevelVariables: number[];
+  functions: Record<string, ByteCodeFunction>;
   blocks: Record<BlockId, ByteCodeBlock>;
 }
 
@@ -145,7 +163,7 @@ export class ByteCodeGenerator {
   generate(): ByteCode {
     const topScope = new GeneratorScope(undefined);
 
-    const functions: Record<string, BlockId> = {};
+    const functions: Record<string, ByteCodeFunction> = {};
 
     for (const func of this.program.functions.values()) {
       const functionScope = topScope.newScope();
@@ -155,7 +173,11 @@ export class ByteCodeGenerator {
       functions[func.name] = result;
     }
 
-    return {blocks: this.blocks, functions};
+    return {
+      blocks: this.blocks,
+      functions,
+      topLevelVariables: this.program.variables.map(v => v.id),
+    };
   }
 
   private emit(target: BlockId, instr: ByteCodeInstruction): void {
@@ -184,14 +206,32 @@ export class ByteCodeGenerator {
   private emitFunction(
     scope: GeneratorScope,
     func: FunctionDeclaration
-  ): BlockId {
+  ): ByteCodeFunction {
     const functionBlock = this.newBlock(ByteCodeBlockKind.Function);
+
+    for (const param of func.parameters) {
+      this.emit(functionBlock, {
+        kind: 'assignVariableDirect',
+        target: param.id,
+      });
+    }
 
     for (const statement of func.statements) {
       this.emitStatement(scope, functionBlock, statement);
     }
 
-    return functionBlock;
+    this.emit(functionBlock, {
+      kind: 'pushUndefined',
+    });
+
+    this.emit(functionBlock, {
+      kind: 'return',
+    });
+
+    return {
+      entryBlock: functionBlock,
+      variables: func.variables.map(v => v.id),
+    };
   }
 
   private emitStatement(
@@ -226,6 +266,11 @@ export class ByteCodeGenerator {
 
       this.emit(target, {kind: 'pop'});
     } else if (statement.kind === 'return') {
+      if (statement.value !== undefined) {
+        this.emitExpression(scope, target, statement.value);
+      } else {
+        this.emit(target, {kind: 'pushUndefined'});
+      }
       this.emit(target, {kind: 'return'});
     } else if (statement.kind === 'continue') {
       this.emit(target, {kind: 'continue'});
@@ -252,11 +297,15 @@ export class ByteCodeGenerator {
         this.emitExpression(scope, target, arg);
       }
 
-      this.emit(target, {kind: 'systemCall', type: expression.type});
+      this.emit(target, {
+        kind: 'systemCall',
+        type: expression.type,
+        length: expression.args.length,
+      });
     } else if (expression.kind === 'variable') {
       // TODO(joshua): I might need to resolve this variable into a register.
 
-      this.emit(target, {kind: 'pushVariable', variable: expression});
+      this.emit(target, {kind: 'pushVariable', variable: expression.id});
     } else if (expression.kind === 'assignmentExpression') {
       this.emitExpression(scope, target, expression.target);
       this.emitExpression(scope, target, expression.value);

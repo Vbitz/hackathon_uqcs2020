@@ -137,7 +137,11 @@ export type Type = PrimitiveType | ArrayType;
 export class Variable {
   kind: 'variable' = 'variable';
 
-  constructor(readonly name: string, readonly type: Type) {}
+  constructor(
+    readonly name: string,
+    readonly type: Type,
+    readonly id: number
+  ) {}
 }
 
 export class Scope {
@@ -168,11 +172,11 @@ export class FunctionDeclaration extends Scope {
   }
 
   addParameter(name: string, type: Type) {
-    this.parameters.push(new Variable(name, type));
+    this.parameters.push(this.owner.newVariable(name, type));
   }
 
   declareVariable(name: string, type: Type) {
-    this.variables.push(new Variable(name, type));
+    this.variables.push(this.owner.newVariable(name, type));
   }
 
   resolveVariable(name: string): Variable | undefined {
@@ -195,6 +199,8 @@ export class FunctionDeclaration extends Scope {
 export class Program {
   readonly functions = new Map<string, FunctionDeclaration>();
   readonly variables: Variable[] = [];
+
+  private nextVariableId = 0;
 
   private deferredCalls: Array<() => void> = [];
 
@@ -234,6 +240,10 @@ export class Program {
     }
 
     return undefined;
+  }
+
+  newVariable(name: string, type: Type): Variable {
+    return new Variable(name, type, this.nextVariableId++);
   }
 
   private parseTopLevel(node: ast.Node) {
@@ -462,10 +472,13 @@ export class Program {
       const nodes = node.children;
 
       if (utils.matchIdentifer(nodes[0], 'write')) {
-        return makeSystemCall(
-          SystemCallKind.DebugWrite,
-          this.parseExpression(scope, nodes[1])
-        );
+        const [_, ...argNodes] = nodes;
+
+        const args = argNodes
+          .map(val => this.parseExpression(scope, val))
+          .reverse();
+
+        return makeSystemCall(SystemCallKind.DebugWrite, ...args);
       } else if (utils.matchIdentifer(nodes[0], 'read')) {
         return makeSystemCall(SystemCallKind.DebugRead);
       } else if (utils.matchIdentifer(nodes[0], 'get')) {
@@ -550,6 +563,6 @@ export class Program {
   }
 
   private declareVariable(name: string, type: Type) {
-    this.variables.push(new Variable(name, type));
+    this.variables.push(this.newVariable(name, type));
   }
 }

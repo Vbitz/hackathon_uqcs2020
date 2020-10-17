@@ -1,6 +1,7 @@
 import {promises} from 'fs';
 import {registerEntryPoint} from '../common';
-import {ByteCodeGenerator} from './codeGen.bytecode';
+import {ByteCodeGenerator} from './codeGen.byteCode';
+import {Interpreter} from './interpreter';
 import {Parser} from './parser';
 import {Program} from './program';
 
@@ -25,9 +26,9 @@ registerEntryPoint('compiler:interpreter', async args => {
 
   const byteCode = codeGen.generate();
 
-  // const interpreter = new Interpreter(program);
+  const interpreter = new Interpreter(byteCode);
 
-  // interpreter.run();
+  await interpreter.run();
 
   return 0;
 });
