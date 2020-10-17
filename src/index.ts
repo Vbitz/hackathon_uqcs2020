@@ -1,3 +1,5 @@
+require('source-map-support').install();
+
 import {getEntryPoint} from './common';
 import {getLogger} from './logger';
 

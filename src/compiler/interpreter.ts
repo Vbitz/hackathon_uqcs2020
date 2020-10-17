@@ -49,19 +49,21 @@ export class Interpreter {
     const {target} = frame;
 
     for (const statement of target.statements) {
-      if (statement.kind === 'systemCall') {
-        this.runSystemCall(statement.type, statement.args);
+      if (statement.kind === 'expression') {
+        this.executeExpression(statement.expression);
       } else {
         throw new Error(`Statement ${statement.kind} not implemented.`);
       }
     }
   }
 
-  private runSystemCall(type: SystemCallKind, args: Expression[]) {
-    if (type === SystemCallKind.DebugPrint) {
+  private runSystemCall(type: SystemCallKind, args: Expression[]): string {
+    if (type === SystemCallKind.DebugWrite) {
       const value = this.executeExpression(args[0]);
 
       log.log('DebugPrint', value);
+
+      return '';
     } else {
       throw new Error('System Call not found.');
     }
@@ -90,8 +92,10 @@ export class Interpreter {
       } else {
         throw new Error('Unknown Operator');
       }
+    } else if (expr.kind === 'systemCall') {
+      return this.runSystemCall(expr.type, expr.args);
     } else {
-      throw new Error(`executeExpression not implemented for {}.`);
+      throw new Error(`executeExpression not implemented for ${expr.kind}.`);
     }
   }
 }

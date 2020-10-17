@@ -7,7 +7,7 @@
   (while true
     (write text)
     
-    (assign input (keypress))
+    (assign input (read))
 
     (write input "\n")
 
