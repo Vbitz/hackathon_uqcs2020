@@ -41,6 +41,7 @@
 
     (if ((get boardState input) != " ")
       (write "That space is already taken\n")
+
       (continue)
     )
 
@@ -92,6 +93,8 @@
 
   (assign result (checkWinSingle 2 4 6))
   (if (result != " ") (return result))
+
+  (return " ")
 )
 
 (fn (reset :void)
@@ -105,7 +108,7 @@
   (set boardState 7 " ")
   (set boardState 8 " ")
 
-  (assign currentTurn " ")
+  (assign currentTurn "X")
 )
 
 (fn (printBoard :void)
@@ -124,14 +127,10 @@
   
     (if (currentTurn == "X")
       (doTurn currentTurn)
-
-      (assign currentTurn "O")
     )
 
     (if (currentTurn == "O")
       (doTurn currentTurn)
-
-      (assign currentTurn "X")
     )
   
     (assign isWin (checkWin))
@@ -142,6 +141,18 @@
       (write isWin " Wins\n\n")
 
       (return)
+    )
+
+    (if (currentTurn == "X")
+      (assign currentTurn "O")
+
+      (continue)
+    )
+
+    (if (currentTurn == "O")
+      (assign currentTurn "X")
+
+      (continue)
     )
   )
 )

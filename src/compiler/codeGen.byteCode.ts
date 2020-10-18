@@ -77,6 +77,10 @@ export interface EnterBlockInstruction extends BaseInstruction {
   block: BlockId;
 }
 
+export interface ExitBlockInstruction extends BaseInstruction {
+  kind: 'exitBlock';
+}
+
 export interface BranchEnterInstruction extends BaseInstruction {
   kind: 'branchEnter';
   block: BlockId;
@@ -116,6 +120,7 @@ export type ByteCodeInstruction =
   | CallInstruction
   | SystemCallInstruction
   | EnterBlockInstruction
+  | ExitBlockInstruction
   | BranchEnterInstruction
   | BranchReturnInstruction
   | PopInstruction
@@ -209,7 +214,7 @@ export class ByteCodeGenerator {
   ): ByteCodeFunction {
     const functionBlock = this.newBlock(ByteCodeBlockKind.Function);
 
-    for (const param of func.parameters) {
+    for (const param of func.parameters.reverse()) {
       this.emit(functionBlock, {
         kind: 'assignVariableDirect',
         target: param.id,
@@ -220,18 +225,29 @@ export class ByteCodeGenerator {
       this.emitStatement(scope, functionBlock, statement);
     }
 
-    this.emit(functionBlock, {
-      kind: 'pushUndefined',
-    });
-
-    this.emit(functionBlock, {
-      kind: 'return',
-    });
+    this.finalizeFunction(functionBlock);
 
     return {
       entryBlock: functionBlock,
       variables: func.variables.map(v => v.id),
     };
+  }
+
+  private finalizeFunction(blockId: BlockId) {
+    const block = this.blocks[blockId];
+
+    // If we already emitted a return then don't emit another one.
+    if (block.instructions[block.instructions.length - 1].kind === 'return') {
+      return;
+    }
+
+    this.emit(blockId, {
+      kind: 'pushUndefined',
+    });
+
+    this.emit(blockId, {
+      kind: 'return',
+    });
   }
 
   private emitStatement(
@@ -250,6 +266,8 @@ export class ByteCodeGenerator {
         this.emitStatement(scope, block, child);
       }
 
+      this.emit(block, {kind: 'continue'});
+
       this.emit(target, {kind: 'enterBlock', block});
     } else if (statement.kind === 'if') {
       this.emitExpression(scope, target, statement.condition);
@@ -259,6 +277,8 @@ export class ByteCodeGenerator {
       for (const child of statement.body) {
         this.emitStatement(scope, block, child);
       }
+
+      this.emit(block, {kind: 'exitBlock'});
 
       this.emit(target, {kind: 'branchEnter', block});
     } else if (statement.kind === 'expression') {
@@ -307,8 +327,12 @@ export class ByteCodeGenerator {
 
       this.emit(target, {kind: 'pushVariable', variable: expression.id});
     } else if (expression.kind === 'assignmentExpression') {
-      this.emitExpression(scope, target, expression.target);
       this.emitExpression(scope, target, expression.value);
+      this.emitExpression(scope, target, expression.target);
+
+      if (expression.target.kind !== 'variable') {
+        throw new Error('expression.target must be a Variable.');
+      }
 
       this.emit(target, {kind: 'assignVariable'});
     } else if (expression.kind === 'binaryExpression') {

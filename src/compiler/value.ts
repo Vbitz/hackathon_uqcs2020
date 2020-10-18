@@ -52,6 +52,8 @@ export function fromNumber(value: number): Value {
 export function toString(value: Value): string {
   if (value.kind === 'string') {
     return value.value;
+  } else if (value.kind === 'integer') {
+    return value.value.toString(10);
   } else {
     throw new Error(`toString not implemented for ${value.kind}`);
   }

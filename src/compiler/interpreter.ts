@@ -20,7 +20,17 @@ export class BlockFrame {
 
   variables = new Map<number, value.Value>();
 
-  constructor(readonly block: ByteCodeBlock) {}
+  constructor(readonly block: ByteCodeBlock, readonly id: number) {}
+}
+
+async function readChar(): Promise<string> {
+  process.stdin.setRawMode(true);
+  return new Promise(resolve =>
+    process.stdin.once('data', chunk => {
+      process.stdin.setRawMode(false);
+      resolve(chunk.toString('utf8')[0]);
+    })
+  );
 }
 
 export class Interpreter {
@@ -31,39 +41,58 @@ export class Interpreter {
 
   constructor(readonly byteCode: ByteCode) {}
 
-  async run() {
+  async run(): Promise<number> {
     for (const topLevelVariable of this.byteCode.topLevelVariables) {
       this.topLevelVariables.set(topLevelVariable, value.undefined);
     }
 
     await this.runInstruction({kind: 'call', target: 'main'});
 
-    await this.runLoop();
+    return this.runLoop();
   }
 
-  private async runLoop() {
+  private async runLoop(): Promise<number> {
     while (true) {
       const currentBlock = this.blockStack[this.blockStack.length - 1];
 
       if (currentBlock === undefined) {
-        break;
+        return 0;
       }
 
       const currentInstruction =
         currentBlock.block.instructions[currentBlock.instructionPointer];
 
-      await this.runInstruction(currentInstruction);
+      if (currentInstruction === undefined) {
+        throw new Error('Invalid Instruction Pointer');
+      }
+
+      try {
+        if (!(await this.runInstruction(currentInstruction))) {
+          return 1;
+        }
+      } catch (ex) {
+        log.log('Error running instruction', ex);
+        log.log(
+          'Current Block is a ' + ByteCodeBlockKind[currentBlock.block.kind]
+        );
+        log.log('BlockId =', currentBlock.id);
+        log.log('IP =', currentBlock.instructionPointer);
+        return 1;
+      }
 
       currentBlock.instructionPointer += 1;
     }
   }
 
-  private async runInstruction(instr: ByteCodeInstruction) {
+  private async runInstruction(instr: ByteCodeInstruction): Promise<boolean> {
     if (instr.kind === 'call') {
       const functionInfo = this.getFunction(instr.target);
       const functionBlock = this.getBlock(functionInfo.entryBlock);
 
-      const functionFrame = new BlockFrame(functionBlock);
+      const functionFrame = new BlockFrame(
+        functionBlock,
+        functionInfo.entryBlock
+      );
 
       for (const variable of functionInfo.variables) {
         functionFrame.variables.set(variable, value.undefined);
@@ -73,14 +102,20 @@ export class Interpreter {
     } else if (instr.kind === 'systemCall') {
       if (instr.type === SystemCallKind.DebugWrite) {
         for (let i = 0; i < instr.length; i++) {
-          const arg = this.pop();
+          const arg = this.resolveValue(this.pop());
 
           process.stdout.write(value.toString(arg));
         }
 
         this.push(value.undefined);
       } else {
-        throw new Error(`SystemCall ${instr.type} not implemented`);
+        const chr = await readChar();
+
+        if (chr.charCodeAt(0) == 3) {
+          return false;
+        }
+
+        this.push(value.fromString(chr));
       }
     } else if (instr.kind === 'pushVariable') {
       this.push(value.fromVariable(instr.variable));
@@ -95,8 +130,8 @@ export class Interpreter {
     } else if (instr.kind === 'pop') {
       this.pop();
     } else if (instr.kind === 'arraySet') {
-      const newValue = this.pop();
-      const index = this.pop();
+      const newValue = this.resolveValue(this.pop());
+      const index = this.resolveValue(this.pop());
       const target = this.pop();
 
       if (target.kind !== 'variable') {
@@ -115,15 +150,19 @@ export class Interpreter {
         }
       }
 
-      arrayValue.values[value.toNumber(index)] = newValue;
+      const indexNum = value.toNumber(index);
+
+      // log.log('set', target, indexNum, newValue);
+
+      arrayValue.values[indexNum] = newValue;
 
       this.push(value.undefined);
     } else if (instr.kind === 'arrayGet') {
-      const index = this.pop();
+      const index = this.resolveValue(this.pop());
       const target = this.pop();
 
       if (target.kind !== 'variable') {
-        throw new Error('arraySet target is not a variable');
+        throw new Error('arrayGet target is not a variable');
       }
 
       let arrayValue = this.getVariable(target.target);
@@ -138,7 +177,11 @@ export class Interpreter {
         }
       }
 
-      const result = arrayValue.values[value.toNumber(index)];
+      const indexNum = value.toNumber(index);
+
+      // log.log('get', target, indexNum);
+
+      const result = arrayValue.values[indexNum];
 
       if (result === undefined) {
         this.push(value.undefined);
@@ -146,23 +189,31 @@ export class Interpreter {
         this.push(result);
       }
     } else if (instr.kind === 'assignVariable') {
-      const newValue = this.pop();
       const target = this.pop();
+      const newValue = this.resolveValue(this.pop());
 
       if (target.kind !== 'variable') {
-        throw new Error('arraySet target is not a variable');
+        throw new Error('assignVariable target is not a variable');
       }
+
+      // log.log('assign to', target.target, newValue);
 
       this.setVariable(target.target, newValue);
 
       this.push(newValue);
     } else if (instr.kind === 'assignVariableDirect') {
-      const newValue = this.pop();
+      const newValue = this.resolveValue(this.pop());
+
+      // log.log('assign direct', instr.target, newValue);
 
       this.setVariable(instr.target, newValue);
-
-      this.push(newValue);
     } else if (instr.kind === 'return') {
+      // The return value could be a reference local to the current function.
+      // The solution is to pop the last value from the stack and resolve it.
+      // Functions always have a return value.
+      const returnValue = this.pop();
+      this.push(this.resolveValue(returnValue));
+
       // Unroll the stack until we reach a function.
       while (true) {
         const currentBlock = this.blockStack.pop();
@@ -178,7 +229,9 @@ export class Interpreter {
     } else if (instr.kind === 'enterBlock') {
       const block = this.getBlock(instr.block);
 
-      this.blockStack.push(new BlockFrame(block));
+      this.blockStack.push(new BlockFrame(block, instr.block));
+    } else if (instr.kind === 'exitBlock') {
+      this.blockStack.pop();
     } else if (instr.kind === 'branchEnter') {
       const test = this.pop();
 
@@ -187,7 +240,7 @@ export class Interpreter {
       if (testBool) {
         const block = this.getBlock(instr.block);
 
-        this.blockStack.push(new BlockFrame(block));
+        this.blockStack.push(new BlockFrame(block, instr.block));
       }
     } else if (instr.kind === 'branchReturn') {
       const test = this.pop();
@@ -204,9 +257,44 @@ export class Interpreter {
       const result = this.runOperation(instr.op, lhs, rhs);
 
       this.push(result);
+    } else if (instr.kind === 'continue') {
+      let changedBlock = false;
+      while (true) {
+        const currentBlock = this.blockStack[this.blockStack.length - 1];
+
+        if (currentBlock.block.kind === ByteCodeBlockKind.While) {
+          if (changedBlock) {
+            currentBlock.instructionPointer = 0;
+          } else {
+            currentBlock.instructionPointer = -1;
+          }
+
+          this.blockStack.push(currentBlock);
+
+          // TODO(joshua): Is this correct?
+          currentBlock.variables.clear();
+
+          break;
+        } else if (currentBlock.block.kind === ByteCodeBlockKind.If) {
+          this.blockStack.pop();
+          changedBlock = true;
+        } else {
+          throw new Error("Continue can't unroll from function calls.");
+        }
+      }
+    } else if (instr.kind === 'break') {
+      const currentBlock = this.blockStack[this.blockStack.length - 1];
+
+      if (currentBlock.block.kind === ByteCodeBlockKind.While) {
+        this.blockStack.pop();
+      } else {
+        throw new Error('Continue not implemented in nested blocks');
+      }
     } else {
-      throw new Error(`Instruction ${instr.kind} not implemented.`);
+      throw new Error(`Instruction {} not implemented.`);
     }
+
+    return true;
   }
 
   private push(val: value.Value) {
@@ -263,6 +351,8 @@ export class Interpreter {
     for (let i = this.blockStack.length; i > 0; i--) {
       const block = this.blockStack[i - 1];
 
+      // log.log(block.id, block.variables);
+
       if (block.variables.has(id)) {
         return block.variables.get(id) || expect('Unreachable');
       }
@@ -272,7 +362,7 @@ export class Interpreter {
       return this.topLevelVariables.get(id) || expect('Unreachable');
     }
 
-    return value.undefined;
+    throw new Error('Could not find variable: ' + id);
   }
 
   private runOperation(
@@ -280,6 +370,8 @@ export class Interpreter {
     lhs: value.Value,
     rhs: value.Value
   ): value.Value {
+    // log.log('runOperation', lhs, rhs);
+
     if (op === OperatorKind.Equals) {
       const lhsValue = this.resolveValue(lhs);
       const rhsValue = this.resolveValue(rhs);
@@ -293,6 +385,19 @@ export class Interpreter {
           value.toBoolean(lhsValue) === value.toBoolean(rhsValue)
         );
       }
+    } else if (op === OperatorKind.NotEquals) {
+      const lhsValue = this.resolveValue(lhs);
+      const rhsValue = this.resolveValue(rhs);
+
+      if (lhsValue.kind === 'string' && rhsValue.kind === 'string') {
+        return value.fromBoolean(
+          value.toString(lhsValue) !== value.toString(rhsValue)
+        );
+      } else {
+        return value.fromBoolean(
+          value.toBoolean(lhsValue) !== value.toBoolean(rhsValue)
+        );
+      }
     } else {
       throw new Error(`runOperation not implemented for ${op}`);
     }
@@ -300,7 +405,7 @@ export class Interpreter {
 
   private resolveValue(val: value.Value): value.Value {
     if (val.kind === 'variable') {
-      return this.getVariable(val.target);
+      return this.resolveValue(this.getVariable(val.target));
     } else {
       return val;
     }

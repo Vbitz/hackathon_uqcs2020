@@ -26,9 +26,13 @@ registerEntryPoint('compiler:interpreter', async args => {
 
   const byteCode = codeGen.generate();
 
+  await promises.writeFile(
+    'code.json',
+    JSON.stringify(byteCode, undefined, '  '),
+    'utf-8'
+  );
+
   const interpreter = new Interpreter(byteCode);
 
-  await interpreter.run();
-
-  return 0;
+  return interpreter.run();
 });
