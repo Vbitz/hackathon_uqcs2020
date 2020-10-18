@@ -1,5 +1,9 @@
 # Hackathon Project (UQCS 2020)
 
+## Slides
+
+[Slides Here](https://docs.google.com/presentation/d/1Hk0hTCYb5ZKLzghBCDxw6Oq0n3SURw0gmEMowWh1jbc/edit?usp=sharing)
+
 ## Project Ideas
 
 - What about my old competitive programming game idea?
